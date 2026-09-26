@@ -26,3 +26,23 @@ enum TestImages {
         ImageCoding.pngData(from: cgImage(width: width, height: height, red: red))!
     }
 }
+
+/// Deterministic clock: every call is one second later than the previous one.
+final class TestClock {
+    private(set) var current = Date(timeIntervalSince1970: 1_700_000_000)
+
+    func now() -> Date {
+        current = current.addingTimeInterval(1)
+        return current
+    }
+}
+
+@MainActor
+func makeHistoryStore(
+    limit: Int = HistoryStore.defaultLimit,
+    clock: TestClock = TestClock(),
+    appName: @escaping @MainActor (String) -> String? = { _ in nil }
+) throws -> HistoryStore {
+    let images = try ImageStore(directory: makeTempDirectory())
+    return try HistoryStore.inMemory(images: images, limit: limit, now: clock.now, appName: appName)
+}
