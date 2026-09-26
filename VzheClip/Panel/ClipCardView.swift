@@ -58,12 +58,12 @@ struct ClipCardView: View {
                 Image(nsImage: appIcon).resizable().frame(width: 14, height: 14)
             }
             if item.kind == .image, let width = item.imageWidth, let height = item.imageHeight {
-                Text("\(width)×\(height)")
+                Text(verbatim: "\(width)×\(height)")
             }
             Text(Self.relativeTime(item.lastUsedAt))
             Spacer()
             if position < 9 {
-                Text("⌘\(position + 1)")
+                Text(verbatim: "⌘\(position + 1)")
             }
         }
         .font(.system(size: 11))
