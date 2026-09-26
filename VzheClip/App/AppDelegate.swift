@@ -3,7 +3,7 @@ import os
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     /// Unit tests run hosted inside the app; skip all OS side effects in that case.
     static var isRunningTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -131,7 +131,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: "Clear History")
         alert.addButton(withTitle: "Cancel")
         NSApp.activate()
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let response = alert.runModal()
+        // VzheClip has no window of its own once the alert is gone; step back down so the
+        // app the user was working in (not VzheClip) is frontmost for their next ⌥V paste.
+        NSApp.hide(nil)
+        guard response == .alertFirstButtonReturn else { return }
         do { try store?.clearUnpinned() } catch {
             logger.error("Clear failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -154,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             window.title = "VzheClip Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
+            window.delegate = self
             settingsWindow = window
         }
         NSApp.activate()
@@ -176,9 +181,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.title = "Welcome to VzheClip"
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
+        window.delegate = self
         onboardingWindow = window
         NSApp.activate()
         window.center()
         window.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: - NSWindowDelegate
+
+    /// The Settings and onboarding windows are VzheClip's only windows; once either closes,
+    /// step back down so the previously frontmost app (not VzheClip) is frontmost again for
+    /// the user's next ⌥V paste.
+    func windowWillClose(_ notification: Notification) {
+        NSApp.hide(nil)
     }
 }
