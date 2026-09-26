@@ -57,6 +57,11 @@ final class PanelController: NSObject, NSWindowDelegate {
                 cursor: mouse, panelSize: Self.panelSize, visibleFrame: screen.visibleFrame
             ))
         }
+        // AppDelegate hides VzheClip (NSApp.hide) after its own windows close, so a stale
+        // hidden state can otherwise keep the panel from appearing on the next ⌥V. Unhiding
+        // without activating brings it back without stealing focus from the previous app,
+        // which auto-paste depends on staying frontmost.
+        NSApp.unhideWithoutActivation()
         panel.makeKeyAndOrderFront(nil)
         installKeyMonitor()
     }
