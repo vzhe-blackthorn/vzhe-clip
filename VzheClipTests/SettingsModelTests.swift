@@ -3,14 +3,17 @@ import XCTest
 
 @MainActor
 final class SettingsModelTests: XCTestCase {
-    private func makeModel(store: HistoryStore? = nil) throws -> (SettingsModel, Preferences, HistoryStore, () -> [Bool]) {
+    private func makeModel(
+        store: HistoryStore? = nil,
+        isLaunchAtLoginEnabled: @escaping () -> Bool = { false }
+    ) throws -> (SettingsModel, Preferences, HistoryStore, () -> [Bool]) {
         let suite = "VzheClipTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
         let prefs = Preferences(defaults: defaults)
         let store = try store ?? makeHistoryStore()
         var loginCalls: [Bool] = []
-        let model = SettingsModel(prefs: prefs, store: store, isLaunchAtLoginEnabled: false,
+        let model = SettingsModel(prefs: prefs, store: store, isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
                                   applyLaunchAtLogin: { loginCalls.append($0) })
         return (model, prefs, store, { loginCalls })
     }
@@ -39,11 +42,33 @@ final class SettingsModelTests: XCTestCase {
         XCTAssertEqual(store.limit, 5)
     }
 
-    func testLaunchAtLoginIsApplied() throws {
-        let (model, _, _, calls) = try makeModel()
+    // Review Focus (M5): setLaunchAtLogin is optimistic no more — it re-reads the real
+    // status after applying, so a source that doesn't actually flip stays reflected as off.
+    func testSetLaunchAtLoginReReadsActualStatusInsteadOfAssuming() throws {
+        let (model, _, _, calls) = try makeModel(isLaunchAtLoginEnabled: { false })
         model.setLaunchAtLogin(true)
+        XCTAssertEqual(calls(), [true], "apply was still called")
+        XCTAssertFalse(model.launchAtLogin, "status source stayed false, so the model reflects that")
+    }
+
+    func testRefreshPicksUpChangedLaunchAtLoginStatus() throws {
+        var enabled = false
+        let (model, _, _, _) = try makeModel(isLaunchAtLoginEnabled: { enabled })
+        XCTAssertFalse(model.launchAtLogin)
+        enabled = true
+        model.refresh()
         XCTAssertTrue(model.launchAtLogin)
-        XCTAssertEqual(calls(), [true])
+    }
+
+    func testRefreshRereadsHistoryLimitAndDenyList() throws {
+        let (model, prefs, _, _) = try makeModel()
+        prefs.historyLimit = 42
+        prefs.denyList = ["com.example.other"]
+
+        model.refresh()
+
+        XCTAssertEqual(model.historyLimit, 42)
+        XCTAssertEqual(model.denyList, ["com.example.other"])
     }
 
     func testAddDenyEntryTrimsAndIgnoresDuplicatesAndBlanks() throws {

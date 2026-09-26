@@ -13,16 +13,30 @@ final class SettingsModel {
 
     @ObservationIgnored private let prefs: Preferences
     @ObservationIgnored private let store: HistoryStore
+    @ObservationIgnored private let isLaunchAtLoginEnabled: () -> Bool
     @ObservationIgnored private let applyLaunchAtLogin: (Bool) -> Void
     @ObservationIgnored private let logger = Logger(subsystem: "com.vzh.VzheClip", category: "Settings")
 
-    init(prefs: Preferences, store: HistoryStore, isLaunchAtLoginEnabled: Bool, applyLaunchAtLogin: @escaping (Bool) -> Void) {
+    init(
+        prefs: Preferences, store: HistoryStore,
+        isLaunchAtLoginEnabled: @escaping () -> Bool,
+        applyLaunchAtLogin: @escaping (Bool) -> Void
+    ) {
         self.prefs = prefs
         self.store = store
+        self.isLaunchAtLoginEnabled = isLaunchAtLoginEnabled
         self.applyLaunchAtLogin = applyLaunchAtLogin
         historyLimit = prefs.historyLimit
-        launchAtLogin = isLaunchAtLoginEnabled
+        launchAtLogin = isLaunchAtLoginEnabled()
         denyList = prefs.denyList
+    }
+
+    /// Re-reads everything that can have changed underneath a cached Settings window:
+    /// the actual launch-at-login status, and the history limit / deny-list from prefs.
+    func refresh() {
+        historyLimit = prefs.historyLimit
+        denyList = prefs.denyList
+        launchAtLogin = isLaunchAtLoginEnabled()
     }
 
     func setHistoryLimit(_ value: Int) {
@@ -33,9 +47,12 @@ final class SettingsModel {
         }
     }
 
+    /// Optimistic UI is wrong here: applying the change can silently fail (SMAppService
+    /// throws, or the user has to approve it in System Settings), so re-read the actual
+    /// status afterward instead of assuming the toggle took effect.
     func setLaunchAtLogin(_ enabled: Bool) {
-        launchAtLogin = enabled
         applyLaunchAtLogin(enabled)
+        launchAtLogin = isLaunchAtLoginEnabled()
     }
 
     func addDenyEntry() {

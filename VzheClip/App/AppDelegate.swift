@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var panel: PanelController?
     private var paster: Paster?
     private var settingsWindow: NSWindow?
+    private var settingsModel: SettingsModel?
     private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -183,7 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if settingsWindow == nil {
             let model = SettingsModel(
                 prefs: prefs, store: store,
-                isLaunchAtLoginEnabled: LoginItem.isEnabled,
+                isLaunchAtLoginEnabled: { LoginItem.isEnabled },
                 applyLaunchAtLogin: { LoginItem.setEnabled($0) }
             )
             let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
@@ -191,8 +192,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.delegate = self
+            settingsModel = model
             settingsWindow = window
         }
+        // The cached window can go stale (launch-at-login toggled outside the app, limit/
+        // deny-list changed elsewhere), so re-read everything each time it's shown.
+        settingsModel?.refresh()
         NSApp.activate()
         settingsWindow?.center()
         settingsWindow?.makeKeyAndOrderFront(nil)
