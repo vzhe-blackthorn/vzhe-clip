@@ -22,6 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var settingsModel: SettingsModel?
     private var onboardingWindow: NSWindow?
 
+    /// Created once and re-inserted by menuNeedsUpdate on every menu open (NSMenu.removeAllItems()
+    /// only detaches items; it doesn't release them). setShortcut(for:) keeps its key equivalent
+    /// in sync with rebinding on its own, so calling it again here per open would just leak
+    /// another NotificationCenter observer for no benefit.
+    private lazy var showHistoryItem: NSMenuItem = menuItem("Show History", #selector(showHistory))
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isRunningTests else { return }
         do {
@@ -119,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         menu.delegate = self
         item.menu = menu
         statusItem = item
+        showHistoryItem.setShortcut(for: .toggleHistory)
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -127,9 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             menu.addItem(menuItem("⚠︎ Enable Accessibility for Auto-Paste…", #selector(openAccessibility)))
             menu.addItem(.separator())
         }
-        let show = menuItem("Show History", #selector(showHistory))
-        show.setShortcut(for: .toggleHistory)
-        menu.addItem(show)
+        menu.addItem(showHistoryItem)
         let pause = menuItem("Pause Capture", #selector(togglePause))
         pause.state = (monitor?.isPaused ?? false) ? .on : .off
         menu.addItem(pause)
