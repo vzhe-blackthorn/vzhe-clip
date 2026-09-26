@@ -127,8 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             menu.addItem(.separator())
         }
         let show = menuItem("Show History", #selector(showHistory))
-        show.keyEquivalent = "v"
-        show.keyEquivalentModifierMask = [.option]
+        show.setShortcut(for: .toggleHistory)
         menu.addItem(show)
         let pause = menuItem("Pause Capture", #selector(togglePause))
         pause.state = (monitor?.isPaused ?? false) ? .on : .off
