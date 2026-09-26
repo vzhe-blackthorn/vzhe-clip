@@ -1,0 +1,58 @@
+name: VzheClip
+options:
+  bundleIdPrefix: com.vzh
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    DEVELOPMENT_TEAM: H5U9AQK47X
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.0.0
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: 3.0.0
+targets:
+  VzheClip:
+    type: application
+    platform: macOS
+    sources: [VzheClip]
+    dependencies:
+      - package: GRDB
+      - package: KeyboardShortcuts
+    info:
+      path: VzheClip/Info.plist
+      properties:
+        CFBundleDisplayName: VzheClip
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "14.0"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vzh.VzheClip
+  VzheClipTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [VzheClipTests]
+    dependencies:
+      - target: VzheClip
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.vzh.VzheClipTests
+schemes:
+  VzheClip:
+    build:
+      targets:
+        VzheClip: all
+        VzheClipTests: [test]
+    test:
+      targets:
+        - VzheClipTests
