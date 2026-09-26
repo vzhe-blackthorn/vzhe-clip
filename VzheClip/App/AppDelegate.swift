@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import os
 import SwiftUI
 
@@ -36,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func start() throws {
+        installMainMenu()
+
         let support = try FileManager.default
             .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("VzheClip", isDirectory: true)
@@ -74,6 +77,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         setUpStatusItem()
         runFirstLaunchIfNeeded()
+    }
+
+    // MARK: - Main menu
+
+    /// LSUIElement apps get no main menu for free, so ⌘C/⌘V/⌘X/⌘A/⌘Z would otherwise do
+    /// nothing in text fields (the panel search field, the Settings deny-list field).
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        appMenuItem.submenu = NSMenu()
+        mainMenu.addItem(appMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        // "undo:"/"redo:" aren't exposed by any public Swift-visible class; NSResponder
+        // handles them for the first responder's undo manager without further wiring.
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(redo)
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     // MARK: - Status item
