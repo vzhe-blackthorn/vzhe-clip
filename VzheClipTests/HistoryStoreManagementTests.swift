@@ -1,3 +1,4 @@
+import GRDB
 import XCTest
 @testable import VzheClip
 
@@ -125,5 +126,65 @@ final class HistoryStoreManagementTests: XCTestCase {
         try store.add(.text("fresh"), sourceApp: nil)
         let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
         XCTAssertTrue(names.contains { $0.hasPrefix("history.sqlite.corrupt-") }, "names: \(names)")
+    }
+
+    // Review Focus (M6): a leftover garbage -journal sidecar next to a garbage DB must not
+    // prevent recovery. (SQLite itself discards a journal whose header doesn't parse before
+    // our code ever sees it, so this doesn't exercise the sidecar-move step below — that's
+    // covered directly by testMoveCorruptDatabaseAsideMovesSidecarFiles.)
+    func testOpenOnDiskRecoversWhenLeftoverJournalIsPresent() throws {
+        let dir = try makeTempDirectory()
+        try Data(repeating: 0x41, count: 4096).write(to: dir.appendingPathComponent("history.sqlite"))
+        try Data(repeating: 0x42, count: 16).write(to: dir.appendingPathComponent("history.sqlite-journal"))
+        let images = try ImageStore(directory: dir.appendingPathComponent("images"))
+
+        let store = try HistoryStore.openOnDisk(directory: dir, images: images, limit: 20, appName: { _ in nil })
+
+        XCTAssertTrue(try store.items().isEmpty)
+        try store.add(.text("fresh"), sourceApp: nil)
+        let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        XCTAssertFalse(names.contains("history.sqlite-journal"), "leftover journal left behind: \(names)")
+        XCTAssertTrue(names.contains { $0.hasPrefix("history.sqlite.corrupt-") }, "names: \(names)")
+    }
+
+    /// Direct test of the sidecar-moving step itself (independent of SQLite's own handling of
+    /// a bogus journal, which can discard one before our code ever runs): every existing
+    /// -journal/-wal/-shm sidecar is moved aside with the same corrupt-<stamp> suffix as the
+    /// main file.
+    func testMoveCorruptDatabaseAsideMovesSidecarFiles() throws {
+        let dir = try makeTempDirectory()
+        let dbURL = dir.appendingPathComponent("history.sqlite")
+        try Data([0x01]).write(to: dbURL)
+        try Data([0x02]).write(to: dir.appendingPathComponent("history.sqlite-journal"))
+        try Data([0x03]).write(to: dir.appendingPathComponent("history.sqlite-wal"))
+        try Data([0x04]).write(to: dir.appendingPathComponent("history.sqlite-shm"))
+
+        HistoryStore.moveCorruptDatabaseAside(dbURL, directory: dir, stamp: "test-stamp")
+
+        let names = Set(try FileManager.default.contentsOfDirectory(atPath: dir.path))
+        XCTAssertEqual(names, [
+            "history.sqlite.corrupt-test-stamp",
+            "history.sqlite.corrupt-test-stamp-journal",
+            "history.sqlite.corrupt-test-stamp-wal",
+            "history.sqlite.corrupt-test-stamp-shm",
+        ])
+    }
+
+    func testOpenOnDiskRethrowsNonCorruptionErrors() throws {
+        let dir = try makeTempDirectory()
+        let images = try ImageStore(directory: dir.appendingPathComponent("images"))
+        // A directory in place of the db file: SQLite can't open it, but the failure isn't
+        // corruption, so it must not be moved aside and replaced with a fresh database.
+        try FileManager.default.createDirectory(
+            at: dir.appendingPathComponent("history.sqlite"), withIntermediateDirectories: true
+        )
+
+        XCTAssertThrowsError(
+            try HistoryStore.openOnDisk(directory: dir, images: images, limit: 20, appName: { _ in nil })
+        ) { error in
+            XCTAssertTrue(error is DatabaseError, "expected a DatabaseError, got \(error)")
+        }
+        let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        XCTAssertFalse(names.contains { $0.hasPrefix("history.sqlite.corrupt-") }, "names: \(names)")
     }
 }

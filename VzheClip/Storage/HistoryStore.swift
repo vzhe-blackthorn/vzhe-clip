@@ -282,8 +282,11 @@ final class HistoryStore {
 
     // MARK: - Opening
 
-    /// Opens `history.sqlite` in `directory`. An unreadable database is moved aside to
-    /// `history.sqlite.corrupt-<date>` and replaced by an empty one; the app never crashes on it.
+    /// Opens `history.sqlite` in `directory`. A corrupt database (or one that isn't a
+    /// database at all) is moved aside to `history.sqlite.corrupt-<date>` and replaced by an
+    /// empty one; the app never crashes on it. Any other error (e.g. SQLITE_BUSY, a
+    /// permissions problem) is rethrown untouched instead of destroying a database that
+    /// might just be temporarily unavailable.
     static func openOnDisk(
         directory: URL,
         images: ImageStore,
@@ -293,13 +296,23 @@ final class HistoryStore {
         let dbURL = directory.appendingPathComponent("history.sqlite")
         do {
             return try HistoryStore(dbQueue: DatabaseQueue(path: dbURL.path), images: images, limit: limit, appName: appName)
-        } catch {
+        } catch let error as DatabaseError where error.resultCode == .SQLITE_CORRUPT || error.resultCode == .SQLITE_NOTADB {
             logger.error("History database unusable, starting fresh: \(error.localizedDescription, privacy: .public)")
             let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-            try? FileManager.default.moveItem(
-                at: dbURL, to: directory.appendingPathComponent("history.sqlite.corrupt-\(stamp)")
-            )
+            moveCorruptDatabaseAside(dbURL, directory: directory, stamp: stamp)
             return try HistoryStore(dbQueue: DatabaseQueue(path: dbURL.path), images: images, limit: limit, appName: appName)
+        }
+    }
+
+    /// Moves the corrupt database file, together with any leftover `-journal`/`-wal`/`-shm`
+    /// sidecars, to `history.sqlite.corrupt-<stamp>` (same suffix on each sidecar) so a fresh
+    /// database can be created at `dbURL`. Internal (not private) so it's directly testable.
+    static func moveCorruptDatabaseAside(_ dbURL: URL, directory: URL, stamp: String) {
+        for suffix in ["", "-journal", "-wal", "-shm"] {
+            let source = URL(fileURLWithPath: dbURL.path + suffix)
+            guard FileManager.default.fileExists(atPath: source.path) else { continue }
+            let destination = directory.appendingPathComponent("history.sqlite.corrupt-\(stamp)\(suffix)")
+            try? FileManager.default.moveItem(at: source, to: destination)
         }
     }
 
