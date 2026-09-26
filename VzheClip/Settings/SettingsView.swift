@@ -40,7 +40,12 @@ struct SettingsView: View {
                     }
                 }
                 HStack {
-                    TextField("Bundle ID, e.g. com.example.app", text: $model.newDenyEntry)
+                    // In a grouped Form the title becomes a row label and squeezes the field
+                    // to zero width, so hide the label and show the hint as a prompt instead.
+                    TextField("Bundle ID", text: $model.newDenyEntry, prompt: Text("Bundle ID, e.g. com.example.app"))
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: .infinity)
                         .onSubmit { model.addDenyEntry() }
                     Button("Add") { model.addDenyEntry() }
                         .disabled(model.newDenyEntry.trimmingCharacters(in: .whitespaces).isEmpty)
