@@ -38,6 +38,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vzh.VzheClip
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Release:
+          # Required for notarization (scripts/release.sh).
+          ENABLE_HARDENED_RUNTIME: YES
   VzheClipTests:
     type: bundle.unit-test
     platform: macOS

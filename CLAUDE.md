@@ -238,6 +238,10 @@ OCR on images, multiple panels per display, App Store distribution.
 - Setup: `brew install xcodegen`.
 - Build: `scripts/build.sh` (runs `xcodegen generate` + Debug build).
 - Test: `scripts/test.sh` (all) or `scripts/test.sh -only-testing:VzheClipTests/<Class>`.
+- Release: `scripts/release.sh` → Release build (Hardened Runtime), Developer ID signing,
+  `build/release/VzheClip-<version>.dmg`, notarization + stapling (notarytool profile
+  `vzheclip`). Falls back to Apple Development signing when no Developer ID cert exists.
+  Distributed via GitHub Releases (github.com/vzhe-blackthorn/vzhe-clip), not the App Store.
 - App icon: edit and run `swift scripts/make-icon.swift` (stacked history cards on a
   blue→violet squircle); it regenerates every size in `AppIcon.appiconset`. Commit the PNGs.
 - Both scripts regenerate the project, so new files are always picked up.
