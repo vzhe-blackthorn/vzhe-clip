@@ -223,6 +223,86 @@ final class HistoryStore {
         item.thumbPath.map(images.url(for:))
     }
 
+    // MARK: - Managing
+
+    func markUsed(id: Int64) throws {
+        let timestamp = now().timeIntervalSince1970
+        try dbQueue.write { db in
+            try db.execute(sql: "UPDATE items SET last_used_at = ? WHERE id = ?", arguments: [timestamp, id])
+        }
+        onChange?()
+    }
+
+    /// Unpinning also bumps `last_used_at` so the item becomes the newest unpinned entry
+    /// instead of being pruned right away.
+    func togglePin(id: Int64) throws {
+        let timestamp = now().timeIntervalSince1970
+        try dbQueue.write { db in
+            try db.execute(sql: """
+                UPDATE items
+                SET last_used_at = CASE WHEN is_pinned = 1 THEN ? ELSE last_used_at END,
+                    is_pinned = 1 - is_pinned
+                WHERE id = ?
+                """, arguments: [timestamp, id])
+        }
+        try prune()
+        onChange?()
+    }
+
+    func delete(id: Int64) throws {
+        let removed = try dbQueue.write { db -> ClipItem? in
+            let item = try ClipItem.fetchOne(db, sql: "SELECT * FROM items WHERE id = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM items WHERE id = ?", arguments: [id])
+            return item
+        }
+        images.delete(removed?.filePaths ?? [])
+        onChange?()
+    }
+
+    func clearUnpinned() throws {
+        let removed = try dbQueue.write { db -> [ClipItem] in
+            let rows = try ClipItem.fetchAll(db, sql: "SELECT * FROM items WHERE is_pinned = 0")
+            try db.execute(sql: "DELETE FROM items WHERE is_pinned = 0")
+            return rows
+        }
+        images.delete(removed.flatMap(\.filePaths))
+        onChange?()
+    }
+
+    func setLimit(_ newLimit: Int) throws {
+        limit = Self.clampLimit(newLimit)
+        try prune()
+        onChange?()
+    }
+
+    func removeOrphanedImages() throws {
+        let all = try dbQueue.read { db in try ClipItem.fetchAll(db, sql: "SELECT * FROM items") }
+        images.removeOrphans(keeping: Set(all.flatMap(\.filePaths)))
+    }
+
+    // MARK: - Opening
+
+    /// Opens `history.sqlite` in `directory`. An unreadable database is moved aside to
+    /// `history.sqlite.corrupt-<date>` and replaced by an empty one; the app never crashes on it.
+    static func openOnDisk(
+        directory: URL,
+        images: ImageStore,
+        limit: Int,
+        appName: @escaping @MainActor (String) -> String?
+    ) throws -> HistoryStore {
+        let dbURL = directory.appendingPathComponent("history.sqlite")
+        do {
+            return try HistoryStore(dbQueue: DatabaseQueue(path: dbURL.path), images: images, limit: limit, appName: appName)
+        } catch {
+            logger.error("History database unusable, starting fresh: \(error.localizedDescription, privacy: .public)")
+            let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            try? FileManager.default.moveItem(
+                at: dbURL, to: directory.appendingPathComponent("history.sqlite.corrupt-\(stamp)")
+            )
+            return try HistoryStore(dbQueue: DatabaseQueue(path: dbURL.path), images: images, limit: limit, appName: appName)
+        }
+    }
+
     // MARK: - Pruning
 
     /// Deletes unpinned items beyond `limit` (oldest first) together with their files.
