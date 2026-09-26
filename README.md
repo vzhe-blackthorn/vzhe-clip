@@ -67,3 +67,13 @@ Bump `CFBundleShortVersionString` / `CFBundleVersion` in `project.yml` before ea
 
 Quit VzheClip from its menu, delete it from Applications, then optionally remove
 `~/Library/Application Support/VzheClip` and run `defaults delete com.vzh.VzheClip`.
+
+## Contributing
+
+VzheClip is open source — issues and pull requests are welcome. Please run `scripts/test.sh`
+before opening a PR; `CLAUDE.md` describes the architecture and behaviour spec.
+
+## License
+
+[MIT](LICENSE) © 2026 Volodymyr Zherdetskyi. Uses [GRDB.swift](https://github.com/groue/GRDB.swift)
+and [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) (both MIT).
