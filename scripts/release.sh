@@ -30,13 +30,20 @@ build_release() {
 
 if [ -n "$DEV_ID" ]; then
   echo "Signing with: $DEV_ID"
-  build_release CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Developer ID Application" OTHER_CODE_SIGN_FLAGS=--timestamp
+  # Overrides apply to every target, including SwiftPM resource bundles, so pass the team too.
+  build_release CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Developer ID Application" \
+    DEVELOPMENT_TEAM="$TEAM_ID" OTHER_CODE_SIGN_FLAGS=--timestamp \
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO  # no get-task-allow: notarization rejects it
 else
   echo "warning: no Developer ID Application certificate for team $TEAM_ID — signing with Apple Development (not notarizable)"
   build_release
 fi
 cp -R build/Build/Products/Release/VzheClip.app "$APP"
 codesign --verify --deep --strict "$APP"
+if [ -n "$DEV_ID" ] && codesign -d --entitlements - "$APP" 2>/dev/null | grep -q get-task-allow; then
+  echo "error: app still has the get-task-allow entitlement; notarization would reject it" >&2
+  exit 1
+fi
 
 # DMG: the app plus an /Applications shortcut to drag it onto.
 STAGING="$OUT/dmg"
