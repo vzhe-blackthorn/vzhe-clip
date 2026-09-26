@@ -97,13 +97,18 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func handle(
         windowID: ObjectIdentifier?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags, characters: String?
     ) -> Bool {
-        guard windowID == ObjectIdentifier(panel),
-              let command = PanelKeyCommand.from(
-                  keyCode: keyCode,
-                  modifiers: modifiers,
-                  characters: characters,
-                  searchIsEmpty: viewModel.query.isEmpty
-              )
+        guard windowID == ObjectIdentifier(panel) else { return false }
+        // An input method (e.g. Pinyin, Hangul) composing marked text owns Return/arrows/Esc/⌫
+        // while it's active; claiming them here would break CJK search entry.
+        if let textView = panel.firstResponder as? NSTextView, textView.hasMarkedText() {
+            return false
+        }
+        guard let command = PanelKeyCommand.from(
+            keyCode: keyCode,
+            modifiers: modifiers,
+            characters: characters,
+            searchIsEmpty: viewModel.query.isEmpty
+        )
         else { return false }
         viewModel.perform(command)
         return true
