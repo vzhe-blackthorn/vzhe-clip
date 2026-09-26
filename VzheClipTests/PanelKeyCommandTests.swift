@@ -25,6 +25,13 @@ final class PanelKeyCommandTests: XCTestCase {
         XCTAssertNil(command(kVK_ANSI_1, [.command, .shift], "1"))
     }
 
+    /// ⌘1/⌘P must be recognized by physical key position, not by the character the
+    /// layout produces: AZERTY turns ⌘1 into "&", Cyrillic layouts turn ⌘P into "з".
+    func testCommandKeysMatchByPositionRegardlessOfKeyboardLayout() {
+        XCTAssertEqual(command(kVK_ANSI_1, .command, "&"), .pasteIndex(0), "AZERTY")
+        XCTAssertEqual(command(kVK_ANSI_P, .command, "з"), .togglePin, "Cyrillic")
+    }
+
     func testCommandPTogglesPin() {
         XCTAssertEqual(command(kVK_ANSI_P, .command, "p"), .togglePin)
         XCTAssertNil(command(kVK_ANSI_P, [], "p"))
