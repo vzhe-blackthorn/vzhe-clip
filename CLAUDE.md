@@ -88,7 +88,7 @@ only thing that touches the database.
 
 Location: `~/Library/Application Support/VzheClip/`
 - `history.sqlite`
-- `images/<uuid>.png` (original) and `images/<uuid>_thumb.png` (max 480 px wide)
+- `images/<uuid>.png` (original) and `images/<uuid>_thumb.png` (max 480 px on the longest side)
 
 ```sql
 CREATE TABLE items (
@@ -124,7 +124,8 @@ Use GRDB migrations (`DatabaseMigrator`) from day one; migration ids `v1`, `v2`,
   Rich text (RTF/HTML) is stored as its plain-text representation. File URLs
   (Finder copies) are ignored in v1.
 - Whitespace-only text is ignored.
-- Text > 1 MB is truncated to 1 MB. Images > 50 megapixels are ignored.
+- Text > 1 MB is truncated to 1 MB (on a character boundary). Images > 50 megapixels
+  are ignored (if the pasteboard also has text, the text is captured instead).
 - Images are normalised to PNG before hashing and storing.
 
 ### History rules
@@ -171,19 +172,20 @@ Use GRDB migrations (`DatabaseMigrator`) from day one; migration ids `v1`, `v2`,
 3. Hide panel.
 4. If `AXIsProcessTrusted()`: after ~50 ms post ⌘V (`CGEvent` keyDown/keyUp for
    `kVK_ANSI_V` with `.maskCommand`, `.cghidEventTap`).
-   Else: leave item on clipboard and show a one-time banner in the panel:
-   "Enable Accessibility to auto-paste" → opens
-   `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
+   Else: leave the item on the clipboard (copy-only). While Accessibility is not
+   granted, the panel shows a banner "Enable Accessibility to auto-paste" whose button
+   opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
 
 ### Menu-bar item
 Icon (SF Symbol `doc.on.clipboard`). Menu: Show History (⌥V), Pause Capture,
-Clear History…, Settings…, Quit. Warning badge if hotkey registration failed or
-Accessibility is not granted.
+Clear History…, Settings…, Quit. When Accessibility is not granted, the menu starts
+with "⚠︎ Enable Accessibility for Auto-Paste…". "Clear History" (menu and Settings)
+removes all **unpinned** items after confirmation; pinned items are kept (like Win+V).
 
 ### Settings
 History limit (stepper 5–100), hotkey recorder, Launch at login (toggle,
 `SMAppService`; default ON on first run), deny-list (bundle ids, add/remove),
-Clear all (confirm). Settings window is a normal activating window.
+Clear History (confirm; keeps pins). Settings window is a normal activating window.
 
 ### First run
 Register login item, show a small onboarding window explaining ⌥V and requesting
@@ -195,7 +197,8 @@ Accessibility (`AXIsProcessTrustedWithOptions` with prompt).
   create fresh DB, log via `os.Logger` (subsystem `com.vzh.VzheClip`). Never crash.
 - **Image file missing** when loading an item: delete the row silently.
 - **Orphaned image files** (no row): removed on launch.
-- **Hotkey registration fails:** menu-bar warning; user rebinds in Settings.
+- **Hotkey conflicts:** the KeyboardShortcuts recorder in Settings warns when a chosen
+  shortcut is taken by the system or the app menu; the user rebinds there.
 - **Image decode/encode fails:** skip capture, log.
 - Never log clipboard *contents*; log only kinds, sizes, and ids.
 
@@ -219,11 +222,11 @@ OCR on images, multiple panels per display, App Store distribution.
 
 ## 9. Development workflow
 
-- Setup: `brew install xcodegen` then `xcodegen generate`.
-- Build: `xcodebuild -project VzheClip.xcodeproj -scheme VzheClip -configuration Debug build`
-- Test: `xcodebuild -project VzheClip.xcodeproj -scheme VzheClip test`
-- After changing `project.yml` or adding files, re-run `xcodegen generate`.
-- Accessibility permission is tied to the code signature; sign Debug builds with a
-  stable identity (Apple Development certificate) or the permission resets every build.
+- Setup: `brew install xcodegen`.
+- Build: `scripts/build.sh` (runs `xcodegen generate` + Debug build).
+- Test: `scripts/test.sh` (all) or `scripts/test.sh -only-testing:VzheClipTests/<Class>`.
+- Both scripts regenerate the project, so new files are always picked up.
+- Accessibility permission is tied to the code signature. `project.yml` signs with the
+  Apple Development identity of team `H5U9AQK47X` so the grant survives rebuilds.
 - TDD for all non-UI units. Keep files small and single-purpose.
 - Commits: small, imperative subject line.
