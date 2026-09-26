@@ -73,4 +73,27 @@ final class PasterTests: XCTestCase {
         XCTAssertEqual(f.pasteboard.data(forType: .png), png)
         XCTAssertNotNil(f.pasteboard.data(forType: .tiff))
     }
+
+    // Fix round 1: missing image file must not wipe the clipboard or fire ⌘V.
+    func testMissingImageFileLeavesClipboardUntouchedAndSkipsPaste() async throws {
+        let f = try makeFixture(trusted: true)
+        f.pasteboard.clearContents()
+        f.pasteboard.setString("previous", forType: .string)
+        let png = TestImages.png(width: 8, height: 8)
+        let item = try f.store.add(.image(png: png, width: 8, height: 8), sourceApp: nil)
+        if let url = f.store.imageURL(for: item) {
+            try FileManager.default.removeItem(at: url)
+        }
+        let notPosted = expectation(description: "⌘V not posted")
+        notPosted.isInverted = true
+        f.paster.postCommandV = { notPosted.fulfill() }
+        var hidden = false
+
+        let sent = f.paster.paste(item, hidePanel: { hidden = true })
+
+        XCTAssertFalse(sent)
+        XCTAssertTrue(hidden)
+        XCTAssertEqual(f.pasteboard.string(forType: .string), "previous")
+        await fulfillment(of: [notPosted], timeout: 0.2)
+    }
 }

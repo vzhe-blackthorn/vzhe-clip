@@ -20,9 +20,15 @@ final class Paster {
 
     /// Puts `item` on the clipboard, hides the panel and, if Accessibility is granted,
     /// sends ⌘V to the frontmost app. Returns whether ⌘V was sent.
+    ///
+    /// If the item's data can't be written (e.g. an image whose file went missing), the
+    /// pasteboard is left untouched, the panel is still hidden, and no ⌘V is posted.
     @discardableResult
     func paste(_ item: ClipItem, hidePanel: () -> Void) -> Bool {
-        write(item)
+        guard write(item) else {
+            hidePanel()
+            return false
+        }
         monitor.ignoreChange(pasteboard.changeCount)
         if let id = item.id {
             do { try store.markUsed(id: id) } catch {
@@ -40,21 +46,27 @@ final class Paster {
         return true
     }
 
-    func write(_ item: ClipItem) {
-        pasteboard.clearContents()
+    /// Writes `item` to the pasteboard. Returns whether the write happened; on failure
+    /// (e.g. the image file backing `item` is missing) the pasteboard is left untouched.
+    @discardableResult
+    func write(_ item: ClipItem) -> Bool {
         switch item.kind {
         case .text:
+            pasteboard.clearContents()
             pasteboard.setString(item.text ?? "", forType: .string)
+            return true
         case .image:
             guard let url = store.imageURL(for: item), let png = try? Data(contentsOf: url) else {
                 logger.error("Image file missing for item \(item.id ?? -1, privacy: .public)")
-                return
+                return false
             }
+            pasteboard.clearContents()
             pasteboard.declareTypes([.png, .tiff], owner: nil)
             pasteboard.setData(png, forType: .png)
             if let tiff = NSImage(data: png)?.tiffRepresentation {
                 pasteboard.setData(tiff, forType: .tiff)
             }
+            return true
         }
     }
 
