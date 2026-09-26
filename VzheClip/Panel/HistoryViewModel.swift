@@ -17,7 +17,12 @@ final class HistoryViewModel {
     @ObservationIgnored var isAccessibilityTrusted: () -> Bool = { PermissionsHelper.isTrusted }
     @ObservationIgnored var onPaste: ((ClipItem) -> Void)?
     @ObservationIgnored var onClose: (() -> Void)?
-    @ObservationIgnored var openAccessibilitySettings: () -> Void = { PermissionsHelper.openAccessibilitySettings() }
+    // If the app was never prompted, it isn't listed in System Settings yet, so ask for
+    // trust (showing the system prompt) before opening the pane.
+    @ObservationIgnored var openAccessibilitySettings: () -> Void = {
+        PermissionsHelper.requestTrust()
+        PermissionsHelper.openAccessibilitySettings()
+    }
 
     @ObservationIgnored private let store: HistoryStore
     @ObservationIgnored private let logger = Logger(subsystem: "com.vzh.VzheClip", category: "HistoryViewModel")
