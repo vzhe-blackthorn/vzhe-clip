@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 import XCTest
 @testable import VzheClip
 
+@MainActor
 final class PanelKeyCommandTests: XCTestCase {
     private func command(_ keyCode: Int, _ modifiers: NSEvent.ModifierFlags = [], _ chars: String? = nil, searchIsEmpty: Bool = true) -> PanelKeyCommand? {
         PanelKeyCommand.from(keyCode: UInt16(keyCode), modifiers: modifiers, characters: chars, searchIsEmpty: searchIsEmpty)

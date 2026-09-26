@@ -1,6 +1,7 @@
 import XCTest
 @testable import VzheClip
 
+@MainActor
 final class PanelPlacementTests: XCTestCase {
     private let size = CGSize(width: 360, height: 520)
     private let visible = CGRect(x: 0, y: 0, width: 1440, height: 875)
