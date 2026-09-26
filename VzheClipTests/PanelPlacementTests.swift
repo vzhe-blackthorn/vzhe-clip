@@ -47,4 +47,14 @@ final class PanelPlacementTests: XCTestCase {
         XCTAssertEqual(PanelPlacement.screen(containing: CGPoint(x: 5000, y: 5000), in: [main, left]), main)
         XCTAssertNil(PanelPlacement.screen(containing: .zero, in: []))
     }
+
+    // NSEvent.mouseLocation reports y == frame.maxY on a screen's top row; CGRect.contains
+    // excludes that boundary, so the point must still resolve to the screen it's on.
+    func testPointOnSecondaryScreenTopRowResolvesToThatScreen() {
+        let main = ScreenGeometry(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), visibleFrame: visible)
+        let secondary = ScreenGeometry(frame: CGRect(x: 1440, y: 0, width: 1920, height: 1080),
+                                       visibleFrame: CGRect(x: 1440, y: 0, width: 1920, height: 1055))
+        let topRow = CGPoint(x: 2000, y: 1080)
+        XCTAssertEqual(PanelPlacement.screen(containing: topRow, in: [main, secondary]), secondary)
+    }
 }

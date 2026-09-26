@@ -10,7 +10,13 @@ enum PanelPlacement {
     static let cursorOffset: CGFloat = 8
 
     static func screen(containing point: CGPoint, in screens: [ScreenGeometry]) -> ScreenGeometry? {
-        screens.first { $0.frame.contains(point) } ?? screens.first
+        screens.first { contains($0.frame, point) } ?? screens.first
+    }
+
+    /// Inclusive containment: `CGRect.contains` excludes `maxX`/`maxY`, but
+    /// `NSEvent.mouseLocation` reports `y == frame.maxY` on a screen's top row.
+    private static func contains(_ frame: CGRect, _ point: CGPoint) -> Bool {
+        (frame.minX...frame.maxX).contains(point.x) && (frame.minY...frame.maxY).contains(point.y)
     }
 
     /// Top-left corner goes just below-right of the cursor, then the panel is clamped
