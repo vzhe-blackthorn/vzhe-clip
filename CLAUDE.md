@@ -42,29 +42,36 @@ Only the two SPM dependencies above are allowed without asking first.
 ```
 VzheClip/
 ├─ App/
-│  ├─ AppDelegate.swift        wiring, NSStatusItem + menu, lifecycle
-│  └─ main.swift / VzheClipApp.swift
+│  ├─ AppDelegate.swift        wiring, NSStatusItem + menu, main menu, window delegate, lifecycle
+│  ├─ main.swift                app entry point (NSApplication.shared.run(), no App Sandbox)
+│  └─ OnboardingView.swift      first-run window: ⌥V explainer + Accessibility prompt
 ├─ Capture/
 │  ├─ ClipboardMonitor.swift   polls NSPasteboard.general.changeCount (0.5 s) → CapturedItem
 │  └─ ItemExtractor.swift      NSPasteboard → CapturedItem? (pure; testable w/ named pasteboard)
-├─ Storage/
-│  ├─ HistoryStore.swift       GRDB: add/dedupe/prune/pin/delete/search/clear; single source of truth
-│  ├─ ImageStore.swift         write PNG + thumbnail, delete files, orphan cleanup
-│  └─ Models.swift             ClipItem, CapturedItem, ItemKind
 ├─ Hotkey/
 │  └─ HotkeyManager.swift      KeyboardShortcuts name `.toggleHistory`, default ⌥V
 ├─ Panel/
-│  ├─ PanelController.swift    borderless, non-activating NSPanel; show/hide; positioning
+│  ├─ PanelController.swift    borderless, non-activating NSPanel; show/hide; positioning; local key monitor
+│  ├─ PanelKeyCommand.swift    pure func: keyCode/modifiers → PanelKeyCommand (layout-independent)
 │  ├─ PanelPlacement.swift     pure func: cursor point + screen frame → panel origin (clamped)
 │  ├─ HistoryView.swift        search field + card list + keyboard handling
+│  ├─ HistoryViewModel.swift   @Observable: search/selection/paste/pin/delete, accessibility banner
 │  └─ ClipCardView.swift       text card / image-thumbnail card
 ├─ Paste/
-│  ├─ Paster.swift             write item to pasteboard, hide panel, post ⌘V
-│  └─ PermissionsHelper.swift  AXIsProcessTrusted / prompt / open System Settings
+│  └─ Paster.swift             write item to pasteboard, hide panel, post ⌘V
 ├─ Settings/
 │  ├─ SettingsView.swift       limit, hotkey recorder, launch at login, deny-list, clear all
-│  ├─ Preferences.swift        UserDefaults-backed settings
-│  └─ LoginItem.swift          SMAppService wrapper
+│  └─ SettingsModel.swift      @Observable settings state; refresh() re-reads OS/prefs state
+├─ Storage/
+│  ├─ HistoryStore.swift       GRDB: add/dedupe/prune/pin/delete/search/clear; single source of truth
+│  ├─ ImageStore.swift         write PNG + thumbnail, delete files, orphan cleanup
+│  ├─ ImageCoding.swift        CGImage ⇄ PNG encode/decode, thumbnail scaling (ImageIO)
+│  └─ Models.swift             ClipItem, CapturedItem, ItemKind
+├─ System/
+│  ├─ AppInfo.swift            bundle id → display name / icon (NSWorkspace)
+│  ├─ LoginItem.swift          SMAppService wrapper
+│  ├─ PermissionsHelper.swift  AXIsProcessTrusted / prompt / open System Settings
+│  └─ Preferences.swift        UserDefaults-backed settings
 VzheClipTests/
 project.yml
 ```
@@ -163,6 +170,10 @@ Use GRDB migrations (`DatabaseMigrator`) from day one; migration ids `v1`, `v2`,
   | ⌫ (search empty)    | delete selected                            |
   | any printable key   | goes to search field                       |
   | Esc / click outside / ⌥V again | close                           |
+
+  ⌘1–9/⌘P are matched by physical key position (`kVK_ANSI_*`), not by the character the
+  active keyboard layout produces for that key, so they work the same on any layout
+  (AZERTY, Cyrillic, etc.).
 - Each card also has a context menu: Paste, Pin/Unpin, Delete.
 - Opening the panel always resets search and selects the first item.
 
